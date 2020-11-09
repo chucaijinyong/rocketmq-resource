@@ -49,48 +49,32 @@ import java.util.concurrent.atomic.AtomicLong;
 public class DefaultMessageStore implements MessageStore {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
-    private final MessageStoreConfig messageStoreConfig;
-    // CommitLog
-    private final CommitLog commitLog;
-
-    private final ConcurrentMap<String/* topic */, ConcurrentMap<Integer/* queueId */, ConsumeQueue>> consumeQueueTable;
-
-    private final FlushConsumeQueueService flushConsumeQueueService;
-
-    private final CleanCommitLogService cleanCommitLogService;
-
-    private final CleanConsumeQueueService cleanConsumeQueueService;
-
-    private final IndexService indexService;
-
-    private final AllocateMappedFileService allocateMappedFileService;
-
-    private final ReputMessageService reputMessageService;
-
-    private final HAService haService;
-
-    private final ScheduleMessageService scheduleMessageService;
-
-    private final StoreStatsService storeStatsService;
-
-    private final TransientStorePool transientStorePool;
+    private final MessageStoreConfig messageStoreConfig;	//消息配置属性
+    private final CommitLog commitLog;		//CommitLog文件存储的实现类
+    private final ConcurrentMap<String/* topic */, ConcurrentMap<Integer/* queueId */, ConsumeQueue>> consumeQueueTable;	//消息队列存储缓存表,按照消息主题分组
+    private final FlushConsumeQueueService flushConsumeQueueService;	//消息队列文件刷盘线程
+    private final CleanCommitLogService cleanCommitLogService;	//清除CommitLog文件服务
+    private final CleanConsumeQueueService cleanConsumeQueueService;	//清除ConsumerQueue队列文件服务
+    private final IndexService indexService;	//索引实现类
+    private final AllocateMappedFileService allocateMappedFileService;	//MappedFile分配服务
+    private final ReputMessageService reputMessageService;//CommitLog消息分发,根据CommitLog文件构建ConsumerQueue、IndexFile文件
+    private final HAService haService;	//存储HA机制
+    private final ScheduleMessageService scheduleMessageService;	//消息服务调度线程
+    private final StoreStatsService storeStatsService;	//消息存储服务
+    private final TransientStorePool transientStorePool;	//消息堆外内存缓存
+    private final BrokerStatsManager brokerStatsManager;	//Broker状态管理器
+    private final MessageArrivingListener messageArrivingListener;	//消息拉取长轮询模式消息达到监听器
+    private final BrokerConfig brokerConfig;	//Broker配置类
+    private StoreCheckpoint storeCheckpoint;	//文件刷盘监测点
+    private final LinkedList<CommitLogDispatcher> dispatcherList;	//CommitLog文件转发请求
 
     private final RunningFlags runningFlags = new RunningFlags();
     private final SystemClock systemClock = new SystemClock();
 
     private final ScheduledExecutorService scheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("StoreScheduledThread"));
-    private final BrokerStatsManager brokerStatsManager;
-    private final MessageArrivingListener messageArrivingListener;
-    private final BrokerConfig brokerConfig;
-
     private volatile boolean shutdown = true;
-
-    private StoreCheckpoint storeCheckpoint;
-
     private AtomicLong printTimes = new AtomicLong(0);
-
-    private final LinkedList<CommitLogDispatcher> dispatcherList;
 
     private RandomAccessFile lockFile;
 
@@ -338,6 +322,7 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    @Override
     public PutMessageResult putMessage(MessageExtBrokerInner msg) {
         if (this.shutdown) {
             log.warn("message store has shutdown, so putMessage is forbidden");
@@ -373,7 +358,7 @@ public class DefaultMessageStore implements MessageStore {
             log.warn("putMessage message properties length too long " + msg.getPropertiesString().length());
             return new PutMessageResult(PutMessageStatus.PROPERTIES_SIZE_EXCEEDED, null);
         }
-
+        // 内存是否可用
         if (this.isOSPageCacheBusy()) {
             return new PutMessageResult(PutMessageStatus.OS_PAGECACHE_BUSY, null);
         }

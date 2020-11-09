@@ -600,10 +600,12 @@ public class MQClientInstance {
                             }
                         }
                     } else {
+                        // 获取路由信息
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, 1000 * 3);
                     }
                     if (topicRouteData != null) {
                         TopicRouteData old = this.topicRouteTable.get(topic);
+                        // 比较本地缓存的路由信息和新的路由信息是否一样，如果不一样进行更新本地缓存，这样下一次直接可以走本地了
                         boolean changed = topicRouteDataIsChange(old, topicRouteData);
                         if (!changed) {
                             changed = this.isNeedUpdateTopicRouteInfo(topic);

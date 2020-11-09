@@ -29,20 +29,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class MappedFileQueue {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     private static final InternalLogger LOG_ERROR = InternalLoggerFactory.getLogger(LoggerName.STORE_ERROR_LOGGER_NAME);
-
+    String storePath;	//存储目录
+    int mappedFileSize;	// 单个文件大小
+    CopyOnWriteArrayList<MappedFile> mappedFiles;	//MappedFile文件集合
+    AllocateMappedFileService allocateMappedFileService;	//创建MapFile服务类
+    long flushedWhere = 0;		//当前刷盘指针
+    long committedWhere = 0;	//当前数据提交指针,内存中ByteBuffer当前的写指针,该值大于等于flushWhere
     private static final int DELETE_FILES_BATCH_MAX = 10;
-
-    private final String storePath;
-
-    private final int mappedFileSize;
-
-    private final CopyOnWriteArrayList<MappedFile> mappedFiles = new CopyOnWriteArrayList<MappedFile>();
-
-    private final AllocateMappedFileService allocateMappedFileService;
-
-    private long flushedWhere = 0;
-    private long committedWhere = 0;
-
     private volatile long storeTimestamp = 0;
 
     public MappedFileQueue(final String storePath, int mappedFileSize,
@@ -70,7 +63,7 @@ public class MappedFileQueue {
             }
         }
     }
-
+//    根据存储时间查询MappedFile
     public MappedFile getMappedFileByTime(final long timestamp) {
         Object[] mfs = this.copyMappedFiles(0);
 
@@ -451,7 +444,7 @@ public class MappedFileQueue {
 
     /**
      * Finds a mapped file by offset.
-     *
+     *  根据消息偏移量offset查找MappedFile
      * @param offset Offset.
      * @param returnFirstOnNotFound If the mapped file is not found, then return the first one.
      * @return Mapped file or null (when not found and returnFirstOnNotFound is <code>false</code>).

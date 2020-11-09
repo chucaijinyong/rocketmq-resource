@@ -126,7 +126,7 @@ public class BrokerOuterAPI {
         final List<RegisterBrokerResult> registerBrokerResultList = Lists.newArrayList();
         List<String> nameServerAddressList = this.remotingClient.getNameServerAddressList();
         if (nameServerAddressList != null && nameServerAddressList.size() > 0) {
-
+            // 创建请求头
             final RegisterBrokerRequestHeader requestHeader = new RegisterBrokerRequestHeader();
             requestHeader.setBrokerAddr(brokerAddr);
             requestHeader.setBrokerId(brokerId);
@@ -134,7 +134,7 @@ public class BrokerOuterAPI {
             requestHeader.setClusterName(clusterName);
             requestHeader.setHaServerAddr(haServerAddr);
             requestHeader.setCompressed(compressed);
-
+            // 创建请求体
             RegisterBrokerBody requestBody = new RegisterBrokerBody();
             requestBody.setTopicConfigSerializeWrapper(topicConfigWrapper);
             requestBody.setFilterServerList(filterServerList);
@@ -142,6 +142,7 @@ public class BrokerOuterAPI {
             final int bodyCrc32 = UtilAll.crc32(body);
             requestHeader.setBodyCrc32(bodyCrc32);
             final CountDownLatch countDownLatch = new CountDownLatch(nameServerAddressList.size());
+            // 遍历每一个nameserver地址，分别把每一个broker注册到nameserver上面
             for (final String namesrvAddr : nameServerAddressList) {
                 brokerOuterExecutor.execute(new Runnable() {
                     @Override
@@ -184,6 +185,7 @@ public class BrokerOuterAPI {
 
         if (oneway) {
             try {
+                // 通过netty客户端，向nameserver发送请求进行注册
                 this.remotingClient.invokeOneway(namesrvAddr, request, timeoutMills);
             } catch (RemotingTooMuchRequestException e) {
                 // Ignore

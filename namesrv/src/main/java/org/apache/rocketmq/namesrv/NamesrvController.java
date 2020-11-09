@@ -84,6 +84,7 @@ public class NamesrvController {
 
         this.registerProcessor();
 
+        // 创建线程池每隔10s，扫描未活跃的broker的信息，如果超过120秒未上报则会移除（即关闭连接，重新维护路由相关信息）
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override

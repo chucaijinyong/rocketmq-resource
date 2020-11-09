@@ -81,6 +81,7 @@ public class MappedFile extends ReferenceResource {
     public static void ensureDirOK(final String dirName) {
         if (dirName != null) {
             File f = new File(dirName);
+            System.out.println(f.exists());
             if (!f.exists()) {
                 boolean result = f.mkdirs();
                 log.info(dirName + " mkdir " + (result ? "OK" : "Failed"));

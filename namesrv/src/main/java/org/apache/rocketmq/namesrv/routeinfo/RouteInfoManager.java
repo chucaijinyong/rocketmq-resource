@@ -94,6 +94,7 @@ public class RouteInfoManager {
         return topicList.encode();
     }
 
+    // 注册broker时会维护clusterAddrTable，brokerAddrTable，brokerLiveTable的信息
     public RegisterBrokerResult registerBroker(
         final String clusterName,
         final String brokerAddr,
@@ -106,6 +107,7 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                // 打开写锁，说明注册是一个串行化的过程
                 this.lock.writeLock().lockInterruptibly();
 
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
@@ -420,10 +422,12 @@ public class RouteInfoManager {
 
     public void scanNotActiveBroker() {
         Iterator<Entry<String, BrokerLiveInfo>> it = this.brokerLiveTable.entrySet().iterator();
+        // 遍历，获取无效的进行移除
         while (it.hasNext()) {
             Entry<String, BrokerLiveInfo> next = it.next();
             long last = next.getValue().getLastUpdateTimestamp();
             if ((last + BROKER_CHANNEL_EXPIRED_TIME) < System.currentTimeMillis()) {
+                // 关闭长连接，移除broker信息
                 RemotingUtil.closeChannel(next.getValue().getChannel());
                 it.remove();
                 log.warn("The broker channel expired, {} {}ms", next.getKey(), BROKER_CHANNEL_EXPIRED_TIME);
@@ -536,7 +540,7 @@ public class RouteInfoManager {
                                         topic, queueData);
                                 }
                             }
-
+                            // 如果主题为空，会把主题删除
                             if (queueDataList.isEmpty()) {
                                 itTopicQueueTable.remove();
                                 log.info("remove topic[{}] all queue, from topicQueueTable, because channel destroyed",

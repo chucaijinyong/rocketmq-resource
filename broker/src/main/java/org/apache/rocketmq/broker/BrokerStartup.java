@@ -55,6 +55,8 @@ public class BrokerStartup {
     public static InternalLogger log;
 
     public static void main(String[] args) {
+        // 首先创建brokerController（根据指定的配置文件创建brokerController对象，然后对该对象内部进行初始化赋值并注册钩子方法在JVM关闭时释放资源），
+        // 然后启动brokerController（封装请求对象包括请求头和请求体，调用netty的客户端向每一个nameserver注册broker，完成路由信息的注册，每隔30s会上报自己的状态）
         start(createBrokerController(args));
         System.out.println("启动成功");
     }
@@ -109,11 +111,13 @@ public class BrokerStartup {
             }
 
             final BrokerConfig brokerConfig = new BrokerConfig();
+            // 对于生产者来说，broker需要和它建立连接，broker就是个netty服务器，对于nameserver由于其需要上报状态，broker就是netty客户端
             final NettyServerConfig nettyServerConfig = new NettyServerConfig();
             final NettyClientConfig nettyClientConfig = new NettyClientConfig();
 
             nettyClientConfig.setUseTLS(Boolean.parseBoolean(System.getProperty(TLS_ENABLE,
                 String.valueOf(TlsSystemConfig.tlsMode == TlsMode.ENFORCING))));
+            // 生产者和broker连接默认端口号
             nettyServerConfig.setListenPort(10911);
             final MessageStoreConfig messageStoreConfig = new MessageStoreConfig();
 
@@ -147,7 +151,7 @@ public class BrokerStartup {
                 System.out.printf("Please set the %s variable in your environment to match the location of the RocketMQ installation", MixAll.ROCKETMQ_HOME_ENV);
                 System.exit(-2);
             }
-
+            // 获取nameserver的地址，目的是为了注册路由信息，上报状态，如果nameserver为多个，则用；分割，它会按照；来截取
             String namesrvAddr = brokerConfig.getNamesrvAddr();
             if (null != namesrvAddr) {
                 try {
@@ -207,7 +211,7 @@ public class BrokerStartup {
             MixAll.printObjectProperties(log, nettyServerConfig);
             MixAll.printObjectProperties(log, nettyClientConfig);
             MixAll.printObjectProperties(log, messageStoreConfig);
-
+            // broker的创建和初始化赋值
             final BrokerController controller = new BrokerController(
                 brokerConfig,
                 nettyServerConfig,

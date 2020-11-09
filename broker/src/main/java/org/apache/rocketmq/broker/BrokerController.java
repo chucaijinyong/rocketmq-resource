@@ -859,8 +859,9 @@ public class BrokerController {
 
 
 
+        //注册Broker信息到nameserver
         this.registerBrokerAll(true, false, true);
-
+        //每隔30s上报Broker信息到NameServer
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -871,6 +872,7 @@ public class BrokerController {
                     log.error("registerBrokerAll Exception", e);
                 }
             }
+//            brokerConfig.getRegisterNameServerPeriod() =》private int registerNameServerPeriod = 1000 * 30;
         }, 1000 * 10, Math.max(10000, Math.min(brokerConfig.getRegisterNameServerPeriod(), 60000)), TimeUnit.MILLISECONDS);
 
         if (this.brokerStatsManager != null) {

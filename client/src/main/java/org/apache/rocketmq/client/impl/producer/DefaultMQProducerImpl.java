@@ -151,10 +151,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
                 // 获取客户端实例，
                 // 整个JVM中只存在一个MQClientManager实例，维护一个MQClientInstance缓存表，同一个clientId只会创建一个MQClientInstance。
-                //MQClientInstance封装了RocketMQ网络处理API，是消息生产者和消息消费者与NameServer、Broker打交道的网络通道
+                //MQClientInstance封装了RocketMQ网络处理API，是消息生产者和消息消费者与NameServer、Broker打交道的网络通道,无论是发送消息还是消费消息都要通过MQ的客户端
                 this.mQClientFactory =
                         MQClientManager.getInstance().getAndCreateMQClientInstance(this.defaultMQProducer, rpcHook);
-                //注册当前生产者到到MQClientInstance管理中,方便后续调用网路请求
+                //注册当前生产者到MQClientInstance管理中,方便后续调用网路请求
                 boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
@@ -499,12 +499,14 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             final long timeout
     ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
         this.makeSureStateOK();
+        // 校验消息
         Validators.checkMessage(msg, this.defaultMQProducer);
 
         final long invokeID = random.nextLong();
         long beginTimestampFirst = System.currentTimeMillis();
         long beginTimestampPrev = beginTimestampFirst;
         long endTimestamp = beginTimestampFirst;
+        // 获取路由信息,目的就是为了知道要发送到那个broker
         TopicPublishInfo topicPublishInfo = this.tryToFindTopicPublishInfo(msg.getTopic());
         if (topicPublishInfo != null && topicPublishInfo.ok()) {
             boolean callTimeout = false;
@@ -532,7 +534,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                             callTimeout = true;
                             break;
                         }
-
+                        // 发送消息
                         sendResult = this.sendKernelImpl(msg, mq, communicationMode, sendCallback, topicPublishInfo,
                                 timeout - costTime);
                         endTimestamp = System.currentTimeMillis();
@@ -648,7 +650,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     }
 
     private TopicPublishInfo tryToFindTopicPublishInfo(final String topic) {
-        // 查询缓存表，有则返回，没有则插入缓存，然后从nameserver中更新主题路由信息
+        // 查询本地缓存路由表，有则返回，没有则创建并插入缓存，然后从nameserver中更新主题路由信息
         TopicPublishInfo topicPublishInfo = this.topicPublishInfoTable.get(topic);
         if (null == topicPublishInfo || !topicPublishInfo.ok()) {
             this.topicPublishInfoTable.putIfAbsent(topic, new TopicPublishInfo());
@@ -659,6 +661,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         if (topicPublishInfo.isHaveTopicRouterInfo() || topicPublishInfo.ok()) {
             return topicPublishInfo;
         } else {
+            //如果未找到当前主题的路由信息,则用默认主题继续查找
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic, true, this.defaultMQProducer);
             topicPublishInfo = this.topicPublishInfoTable.get(topic);
             return topicPublishInfo;
@@ -785,7 +788,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
                 SendResult sendResult = null;
                 switch (communicationMode) {
-                    case ASYNC:
+                    case ASYNC://异步发送
                         Message tmpMessage = msg;
                         boolean messageCloned = false;
                         if (msgBodyCompressed) {
@@ -825,7 +828,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                                 this);
                         break;
                     case ONEWAY:
-                    case SYNC:
+                    case SYNC://同步发送
                         long costTimeSync = System.currentTimeMillis() - beginStartTime;
                         if (timeout < costTimeSync) {
                             throw new RemotingTooMuchRequestException("sendKernelImpl call timeout");
